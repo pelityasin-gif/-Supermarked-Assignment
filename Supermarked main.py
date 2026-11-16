@@ -2,6 +2,8 @@ import pygame
 import os
 from time import sleep
 
+WIDTH = 1000
+LENGHT = 650
 
 class GroceryItem:
         def _init__(self, name, price):
