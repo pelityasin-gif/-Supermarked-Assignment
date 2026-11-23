@@ -49,7 +49,7 @@ def make_receipt(cart, tax_rate=0.25):
 
 def purchase(cart):
     if not cart.items:                 
-        print("Cart is empty.")
+        print("Kurven er tom.")
         return None
     receipt = make_receipt(cart)
     for line in receipt:
@@ -59,8 +59,8 @@ def purchase(cart):
 #TEST
 if __name__ == "__main__":
     cart = Cart()
-    cart.add("Milk", 12.95)
-    cart.add("Milk", 12.95)
+    cart.add("Mælk", 12.95)
+    cart.add("Mælk", 12.95)
     cart.add("Rugbrød", 22.00)
     purchase(cart)
 
