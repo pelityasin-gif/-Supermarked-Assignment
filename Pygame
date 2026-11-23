@@ -1,0 +1,145 @@
+import pygame
+
+pygame.init()
+screen = pygame.display.set_mode((1100, 720))
+pygame.display.set_caption("Grocery Self-Checkout")
+
+font = pygame.font.Font(None, 28)
+small_font = pygame.font.Font(None, 22)
+clock = pygame.time.Clock()
+class Product:
+    """Stores the name and price of a product."""
+    def __init__(self, name, price):
+        self.name = name
+        self.price = price
+
+
+class Cart:
+    """Stores products and their quantities. It's empty when the program starts."""
+    def __init__(self):
+        self.items = {}
+
+    def add(self, product):
+        """Add one copy of a product."""
+        self.items[product] = self.items.get(product, 0) + 1
+
+    def remove(self, product):
+        """Remove one copy of a product."""
+        if product in self.items:
+            self.items[product] -= 1
+            if self.items[product] == 0:
+                del self.items[product]
+    def total(self):
+        """Calculate the total price."""
+        return sum(p.price * quantity for p, quantity in self.items.items())
+
+
+products = [
+    Product("Banana", 2.50),
+    Product("Spaghetti", 12.00),
+    Product("Tomato", 3.50),
+    Product("Beef", 84.95),
+    Product("Candy", 20.00),
+    Product("Pringles", 15.00),
+    Product("FaxeKondi", 23.00),
+    Product("Milk", 13.00),
+    Product("Cucumber", 10.00),
+    Product("Condoms", 30.00),
+]
+
+cart = Cart()
+checkout_message = ""
+message_end = 0
+running = True
+checkout_button = pygame.Rect(590, 650, 240, 55)
+def product_button(index):
+    """Calculate the position of a product button."""
+    column = index % 2
+    row = index // 2
+    return pygame.Rect(30 + column * 260, 150 + row * 85, 240, 70)
+
+
+while running:
+    for event in pygame.event.get():
+        #Check for the quit event.
+        if event.type == pygame.QUIT:
+            running = False
+
+        # Handle left mouse clicks.
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            position = event.pos
+
+            # Add a clicked product to the cart.
+            for index, product in enumerate(products):
+                if product_button(index).collidepoint(position):
+                    cart.add(product)
+
+            # Change quantities using the minus and plus buttons.
+            row = 0
+            for product in cart.items.copy():
+                y = 200 + row * 35
+                minus = pygame.Rect(990, y, 25, 25)
+                plus = pygame.Rect(1040, y, 25, 25)
+                if minus.collidepoint(position):
+                    cart.remove(product)
+                if plus.collidepoint(position):
+                    cart.add(product)
+                row += 1
+
+            # Complete checkout and clear the cart.
+            if checkout_button.collidepoint(position) and cart.items:
+                total = cart.total()
+                checkout_message = f"Checkout complete! Total: {total:.2f} kr"
+                message_end = pygame.time.get_ticks() + 3000
+                cart.items = {}
+
+    # Draw the background and page titles.
+    screen.fill((245, 245, 245))
+    screen.blit(font.render("Grocery Self-Checkout", True, (0, 0, 0)), (30, 25))
+    screen.blit(font.render("Products", True, (0, 0, 0)), (30, 105))
+    screen.blit(font.render("Your cart", True, (0, 0, 0)), (590, 105))
+
+    # Draw product cards.
+    for index, product in enumerate(products):
+        button = product_button(index)
+        pygame.draw.rect(screen, (255, 255, 255), button)
+        pygame.draw.rect(screen, (80, 80, 80), button, 2)
+        screen.blit(small_font.render(product.name, True, (0, 0, 0)),
+                    (button.x + 10, button.y + 10))
+        screen.blit(small_font.render(f"{product.price:.2f} kr", True, (0, 100, 0)),
+                    (button.x + 10, button.y + 40))
+
+    # Draw cart items and quantity controls.
+    row = 0
+    for product, quantity in cart.items.items():
+        y = 200 + row * 35
+        screen.blit(small_font.render(product.name, True, (0, 0, 0)), (590, y))
+        screen.blit(small_font.render(str(quantity), True, (0, 0, 0)), (1022, y + 2))
+        screen.blit(small_font.render(f"{product.price * quantity:.2f} kr",
+                                      True, (0, 0, 0)), (820, y))
+        pygame.draw.rect(screen, (220, 220, 220), (990, y, 25, 25))
+        pygame.draw.rect(screen, (220, 220, 220), (1040, y, 25, 25))
+        screen.blit(small_font.render("-", True, (0, 0, 0)), (997, y + 3))
+        screen.blit(small_font.render("+", True, (0, 0, 0)), (1046, y + 3))
+        row += 1
+
+    # Draw total and checkout button.
+    screen.blit(font.render(f"Total: {cart.total():.2f} kr", True, (0, 100, 0)),
+                (590, 600))
+    color = (40, 140, 80) if cart.items else (160, 160, 160)
+    pygame.draw.rect(screen, color, checkout_button)
+    pygame.draw.rect(screen, (30, 30, 30), checkout_button, 2)
+    text = font.render("Checkout", True, (255, 255, 255))
+    screen.blit(text, text.get_rect(center=checkout_button.center))
+    # Show a checkout confirmation for three seconds.
+    if pygame.time.get_ticks() < message_end:
+        box = pygame.Rect(30, 650, 520, 55)
+        pygame.draw.rect(screen, (255, 255, 220), box)
+        pygame.draw.rect(screen, (120, 120, 80), box, 2)
+        text = small_font.render(checkout_message, True, (0, 100, 0))
+        screen.blit(text, text.get_rect(center=box.center))
+
+    pygame.display.flip()
+    clock.tick(60)
+
+pygame.quit()
