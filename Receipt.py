@@ -56,7 +56,7 @@ def purchase(cart):
         print(line)
     cart.items.clear()
     return receipt
-
+#TEST
 if __name__ == "__main__":
     cart = Cart()
     cart.add("Milk", 12.95)
