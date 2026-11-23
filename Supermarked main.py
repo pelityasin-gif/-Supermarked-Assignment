@@ -6,9 +6,12 @@ WIDTH = 1000
 LENGHT = 650
 
 class GroceryItem:
-        def _init__(self, name, price):
+        def _init__(self, name, price, quantity=1):
                 self.name = name
                 self.price = price
+                self.quantity = quantity
+        def line_total(self):
+                return self.price*self.quantity
 
 Banana = GroceryItem("Banana", 2.5)
 Spaghetti = GroceryItem("Spaghetti", 12.0)
