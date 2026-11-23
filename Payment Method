@@ -1,1 +1,21 @@
-
+def payment_method(total_price):
+        print("How would you like to pay? (Cash, Card, MobilePay)")
+        payment_method = input()
+        if payment_method == "Cash":
+                print("You have chosen to pay with cash.")
+                cash_amount = float(input("Please enter the amount of cash you are paying: "))
+                if cash_amount >= total_price:
+                        print("Thank you for your payment.")
+                        change = cash_amount - total_price
+                        print(f"Your change is {change} DKK.")
+                else: 
+                        print("Insufficient cash. Please try again.")
+                        return      
+        elif payment_method == "Card":
+                print("You have chosen to pay with card.")
+                sleep(4)
+                os.system("cls" if os.name == "nt" else "clear")
+                print("Thank you for your payment.")
+        else:
+                print("Invalid payment method. Please choose again.")
+                return
