@@ -1,1 +1,293 @@
+import pygame
 
+
+class GroceryItem:
+    def __init__(self, name, price, quantity=1):
+        self.name = name
+        self.price = price
+        self.quantity = quantity
+
+    def line_total(self):
+        return self.price * self.quantity
+
+
+class Cart:
+    def __init__(self):
+        self.items = {}
+
+    def add(self, item):
+        self.items[item] = self.items.get(item, 0) + 1
+
+    def remove(self, item):
+        if item not in self.items:
+            return
+
+        self.items[item] -= 1
+        if self.items[item] == 0:
+            del self.items[item]
+
+    def total(self):
+        return sum(item.price * quantity for item, quantity in self.items.items())
+
+    def clear(self):
+        self.items.clear()
+
+
+def make_receipt(items, tax_rate=0.25):
+    """Create receipt lines from the cart's product-to-quantity dictionary."""
+    lines = [
+        "GROCERY STORE RECEIPT",
+        "-" * 34,
+        f"{'Item':<16}{'Qty':>4}{'Total':>14}",
+    ]
+    subtotal = 0
+
+    for item, quantity in items.items():
+        line_total = item.price * quantity
+        subtotal += line_total
+        lines.append(f"{item.name[:16]:<16}{quantity:>4}{line_total:>14.2f}")
+
+    vat = subtotal * tax_rate / (1 + tax_rate)
+    lines.extend(("-" * 34, f"{'TOTAL':<20}{subtotal:>14.2f}",
+                  f"{'VAT included':<20}{vat:>14.2f}"))
+    return lines
+
+
+pygame.init()
+screen = pygame.display.set_mode((1100, 720))
+pygame.display.set_caption("Grocery Self-Checkout")
+
+font = pygame.font.Font(None, 28)
+small_font = pygame.font.Font(None, 22)
+clock = pygame.time.Clock()
+
+products = [
+    GroceryItem("Banana", 2.50),
+    GroceryItem("Spaghetti", 12.00),
+    GroceryItem("Tomato", 3.50),
+    GroceryItem("Beef", 84.95),
+    GroceryItem("Candy", 20.00),
+    GroceryItem("Pringles", 15.00),
+    GroceryItem("FaxeKondi", 23.00),
+    GroceryItem("Milk", 13.00),
+    GroceryItem("Cucumber", 10.00),
+    GroceryItem("Condoms", 30.00),
+]
+
+cart = Cart()
+checkout_message = ""
+message_end = 0
+receipt_lines = []
+receipt_visible = False
+running = True
+payment_mode = ""
+cash_input = ""
+payment_error = ""
+checkout_button = pygame.Rect(590, 650, 240, 55)
+cash_button = pygame.Rect(320, 290, 460, 50)
+card_button = pygame.Rect(320, 350, 460, 50)
+mobilepay_button = pygame.Rect(320, 410, 460, 50)
+cancel_button = pygame.Rect(320, 480, 460, 45)
+cash_confirm_button = pygame.Rect(320, 400, 220, 50)
+cash_cancel_button = pygame.Rect(560, 400, 220, 50)
+receipt_close_button = pygame.Rect(440, 590, 220, 45)
+
+
+def product_button(index):
+    column = index % 2
+    row = index // 2
+    return pygame.Rect(30 + column * 260, 150 + row * 85, 240, 70)
+
+
+def complete_checkout(method, change=0):
+    """Save a receipt, show the payment result, and empty the cart."""
+    global checkout_message, message_end, payment_mode, payment_error
+    global receipt_lines, receipt_visible
+    total = cart.total()
+    receipt_lines = make_receipt(cart.items)
+    receipt_lines.append(f"Paid by: {method}")
+    if method == "cash":
+        receipt_lines.append(f"Change: {change:.2f} DKK")
+    checkout_message = f"Payment by {method} complete! Total: {total:.2f} DKK"
+    message_end = pygame.time.get_ticks() + 3000
+    receipt_visible = True
+    cart.clear()
+    payment_mode = ""
+    payment_error = ""
+
+
+def pay_cash():
+    """Check the typed cash amount and finish payment if it covers the total."""
+    global checkout_message, payment_error
+    try:
+        amount = float(cash_input)
+    except ValueError:
+        payment_error = "Enter a valid amount, then press Enter."
+        return
+
+    if amount < cart.total():
+        payment_error = "Not enough cash. Enter a larger amount."
+        return
+
+    change = amount - cart.total()
+    complete_checkout("cash", change)
+
+
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+        if payment_mode == "cash" and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                pay_cash()
+            elif event.key == pygame.K_BACKSPACE:
+                cash_input = cash_input[:-1]
+                payment_error = ""
+            elif event.unicode.isdigit() or (
+                event.unicode in (".", ",") and "." not in cash_input and "," not in cash_input
+            ):
+                cash_input += "." if event.unicode == "," else event.unicode
+                payment_error = ""
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            position = event.pos
+
+            if receipt_visible:
+                if receipt_close_button.collidepoint(position):
+                    receipt_visible = False
+            elif payment_mode:
+                if payment_mode == "choose":
+                    if cash_button.collidepoint(position):
+                        payment_mode = "cash"
+                        cash_input = ""
+                        payment_error = ""
+                    elif card_button.collidepoint(position):
+                        complete_checkout("card")
+                    elif mobilepay_button.collidepoint(position):
+                        complete_checkout("MobilePay")
+                    elif cancel_button.collidepoint(position):
+                        payment_mode = ""
+                elif payment_mode == "cash":
+                    if cash_confirm_button.collidepoint(position):
+                        pay_cash()
+                    elif cash_cancel_button.collidepoint(position):
+                        payment_mode = "choose"
+                        payment_error = ""
+            else:
+                for index, product in enumerate(products):
+                    if product_button(index).collidepoint(position):
+                        cart.add(product)
+
+                row = 0
+                for product in cart.items.copy():
+                    y = 200 + row * 35
+                    minus = pygame.Rect(990, y, 25, 25)
+                    plus = pygame.Rect(1040, y, 25, 25)
+
+                    if minus.collidepoint(position):
+                        cart.remove(product)
+                    if plus.collidepoint(position):
+                        cart.add(product)
+                    row += 1
+
+                if checkout_button.collidepoint(position) and cart.items:
+                    payment_mode = "choose"
+
+    screen.fill((245, 245, 245))
+    screen.blit(font.render("Grocery Self-Checkout", True, (0, 0, 0)), (30, 25))
+    screen.blit(font.render("Products", True, (0, 0, 0)), (30, 105))
+    screen.blit(font.render("Your cart", True, (0, 0, 0)), (590, 105))
+
+    for index, product in enumerate(products):
+        button = product_button(index)
+        pygame.draw.rect(screen, (255, 255, 255), button)
+        pygame.draw.rect(screen, (80, 80, 80), button, 2)
+        screen.blit(small_font.render(product.name, True, (0, 0, 0)),
+                    (button.x + 10, button.y + 10))
+        screen.blit(small_font.render(f"{product.price:.2f} DKK", True, (0, 100, 0)),
+                    (button.x + 10, button.y + 40))
+
+    row = 0
+    for product, quantity in cart.items.items():
+        y = 200 + row * 35
+        screen.blit(small_font.render(product.name, True, (0, 0, 0)), (590, y))
+        screen.blit(small_font.render(str(quantity), True, (0, 0, 0)), (1022, y + 2))
+        screen.blit(small_font.render(f"{product.price * quantity:.2f} DKK",
+                                      True, (0, 0, 0)), (820, y))
+        pygame.draw.rect(screen, (220, 220, 220), (990, y, 25, 25))
+        pygame.draw.rect(screen, (220, 220, 220), (1040, y, 25, 25))
+        screen.blit(small_font.render("-", True, (0, 0, 0)), (997, y + 3))
+        screen.blit(small_font.render("+", True, (0, 0, 0)), (1046, y + 3))
+        row += 1
+
+    screen.blit(font.render(f"Total: {cart.total():.2f} DKK", True, (0, 100, 0)),
+                (590, 600))
+    color = (40, 140, 80) if cart.items else (160, 160, 160)
+    pygame.draw.rect(screen, color, checkout_button)
+    pygame.draw.rect(screen, (30, 30, 30), checkout_button, 2)
+    text = font.render("Checkout", True, (255, 255, 255))
+    screen.blit(text, text.get_rect(center=checkout_button.center))
+
+    if pygame.time.get_ticks() < message_end:
+        box = pygame.Rect(30, 650, 520, 55)
+        pygame.draw.rect(screen, (255, 255, 220), box)
+        pygame.draw.rect(screen, (120, 120, 80), box, 2)
+        text = small_font.render(checkout_message, True, (0, 100, 0))
+        screen.blit(text, text.get_rect(center=box.center))
+
+    # Payment is handled in the window so the event loop never waits for input().
+    if payment_mode:
+        panel = pygame.Rect(275, 160, 550, 420)
+        pygame.draw.rect(screen, (255, 255, 255), panel)
+        pygame.draw.rect(screen, (50, 50, 50), panel, 3)
+        heading = "Choose payment method" if payment_mode == "choose" else "Enter cash amount"
+        screen.blit(font.render(heading, True, (0, 0, 0)), (320, 205))
+        screen.blit(small_font.render(f"Amount due: {cart.total():.2f} DKK",
+                                      True, (0, 0, 0)), (320, 245))
+
+        if payment_mode == "choose":
+            for button, label in (
+                (cash_button, "Cash"),
+                (card_button, "Card"),
+                (mobilepay_button, "MobilePay"),
+                (cancel_button, "Cancel"),
+            ):
+                pygame.draw.rect(screen, (225, 235, 225), button)
+                pygame.draw.rect(screen, (70, 70, 70), button, 1)
+                text = small_font.render(label, True, (0, 0, 0))
+                screen.blit(text, text.get_rect(center=button.center))
+        else:
+            screen.blit(small_font.render(f"Cash received: {cash_input} DKK",
+                                          True, (0, 0, 0)), (320, 300))
+            screen.blit(small_font.render("Type the amount and press Enter.",
+                                          True, (0, 0, 0)), (320, 340))
+            for button, label in (
+                (cash_confirm_button, "Pay"),
+                (cash_cancel_button, "Back"),
+            ):
+                pygame.draw.rect(screen, (225, 235, 225), button)
+                pygame.draw.rect(screen, (70, 70, 70), button, 1)
+                text = small_font.render(label, True, (0, 0, 0))
+                screen.blit(text, text.get_rect(center=button.center))
+
+        if payment_error:
+            screen.blit(small_font.render(payment_error, True, (180, 0, 0)), (320, 465))
+
+    # Show the completed receipt until the user closes it.
+    if receipt_visible:
+        panel = pygame.Rect(330, 100, 440, 540)
+        pygame.draw.rect(screen, (255, 255, 255), panel)
+        pygame.draw.rect(screen, (50, 50, 50), panel, 3)
+        for index, line in enumerate(receipt_lines):
+            screen.blit(small_font.render(line, True, (0, 0, 0)),
+                        (365, 135 + index * 27))
+        pygame.draw.rect(screen, (225, 235, 225), receipt_close_button)
+        pygame.draw.rect(screen, (70, 70, 70), receipt_close_button, 1)
+        text = small_font.render("Close receipt", True, (0, 0, 0))
+        screen.blit(text, text.get_rect(center=receipt_close_button.center))
+
+    pygame.display.flip()
+    clock.tick(60)
+
+pygame.quit()
